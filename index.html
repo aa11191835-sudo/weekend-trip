@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>週末去哪？台灣景點抽籤機</title>
+<style>
+  :root {
+    --bg: #eef6fc;
+    --bg-grad: linear-gradient(180deg, #d8ecfb 0%, #eef6fc 40%, #fff6ec 100%);
+    --card: #ffffff;
+    --text: #1f2a37;
+    --muted: #6b7785;
+    --border: #dbe6ef;
+    --chip: #f3f7fb;
+    --sky: #2f8fdc;
+    --sun: #ff8a3d;
+    --sun-dark: #f26b1d;
+    --shadow: 0 12px 30px rgba(30, 70, 110, .12);
+    --north: #4dabf7; --central: #40c057; --south: #ff922b; --east: #845ef7; --island: #15aabf;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #111a24;
+      --bg-grad: linear-gradient(180deg, #13263a 0%, #111a24 45%, #1d1a1f 100%);
+      --card: #1b2633;
+      --text: #e9f0f7;
+      --muted: #97a4b3;
+      --border: #2c3a4a;
+      --chip: #223042;
+      --shadow: 0 12px 30px rgba(0, 0, 0, .45);
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+    background: var(--bg);
+    background-image: var(--bg-grad);
+    background-attachment: fixed;
+    color: var(--text);
+    min-height: 100vh;
+  }
+  header { text-align: center; padding: 32px 16px 12px; }
+  header h1 { margin: 0; font-size: clamp(1.7rem, 5vw, 2.6rem); letter-spacing: 1px; }
+  header h1 .hl { color: var(--sun); }
+  header p { margin: 8px 0 0; color: var(--muted); }
+
+  main {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 16px;
+    display: grid;
+    grid-template-columns: 360px 1fr;
+    gap: 24px;
+    align-items: start;
+  }
+  @media (max-width: 860px) { main { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 20px;
+    box-shadow: var(--shadow);
+  }
+  h3 { margin: 18px 0 10px; font-size: 1rem; }
+  .card > h3:first-child { margin-top: 0; }
+
+  /* 篩選 */
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip {
+    font: inherit; font-size: .95rem;
+    border: 1.5px solid var(--border);
+    background: var(--chip);
+    color: var(--text);
+    padding: 6px 14px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: all .15s;
+  }
+  .chip:hover { border-color: var(--sky); }
+  .chip[aria-pressed="true"] { background: var(--sky); border-color: var(--sky); color: #fff; }
+  .chip[data-region][aria-pressed="true"] { background: var(--c); border-color: var(--c); }
+  select {
+    font: inherit; width: 100%;
+    padding: 8px 10px;
+    border-radius: 10px;
+    border: 1.5px solid var(--border);
+    background: var(--chip);
+    color: var(--text);
+  }
+  .switch { display: flex; align-items: center; gap: 8px; margin-top: 10px; cursor: pointer; }
+  .switch input { width: 18px; height: 18px; accent-color: var(--sun); }
+  .match {
+    margin-top: 18px; padding: 12px;
+    border-radius: 12px;
+    background: var(--chip);
+    text-align: center;
+    font-weight: 700;
+  }
+  .match b { color: var(--sky); font-size: 1.3rem; }
+  .match.zero { color: #e03131; }
+  .link-btn {
+    background: none; border: none; color: var(--muted);
+    font: inherit; font-size: .9rem; cursor: pointer;
+    text-decoration: underline; padding: 0; margin-top: 10px;
+  }
+
+  /* 抽籤舞台 */
+  .stage { text-align: center; }
+  .slot {
+    position: relative;
+    border-radius: 18px;
+    padding: 28px 16px;
+    min-height: 210px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: linear-gradient(135deg, rgba(47,143,220,.12), rgba(255,138,61,.12));
+    border: 2px dashed var(--border);
+    overflow: hidden;
+  }
+  .slot.rolling { border-style: solid; border-color: var(--sun); }
+  .slot.done { border-style: solid; border-color: var(--sky); animation: pop .4s cubic-bezier(.2,1.6,.4,1); }
+  .slot-emoji { font-size: 4rem; line-height: 1.1; }
+  .slot-name { font-size: clamp(1.5rem, 5vw, 2.2rem); font-weight: 900; margin-top: 8px; word-break: keep-all; }
+  .slot-city { color: var(--muted); margin-top: 4px; min-height: 1.4em; }
+  .rolling .slot-emoji, .rolling .slot-name { animation: blur .08s linear infinite alternate; }
+  @keyframes blur { from { transform: translateY(-3px); opacity: .7; } to { transform: translateY(3px); opacity: 1; } }
+  @keyframes pop { from { transform: scale(.92); } to { transform: scale(1); } }
+
+  .detail { margin-top: 16px; display: none; text-align: left; }
+  .detail.show { display: block; animation: fadeUp .35s; }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } }
+  .desc { font-size: 1.05rem; line-height: 1.7; margin: 0 0 12px; }
+  .tags { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tag { font-size: .85rem; padding: 4px 10px; border-radius: 999px; background: var(--chip); border: 1px solid var(--border); }
+  .tag.region { color: #fff; border-color: transparent; background: var(--c); }
+  .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+  .btn {
+    font: inherit; font-weight: 700;
+    border: 1.5px solid var(--border);
+    background: var(--chip); color: var(--text);
+    padding: 10px 16px; border-radius: 12px;
+    cursor: pointer; text-decoration: none;
+    display: inline-flex; align-items: center; gap: 6px;
+    transition: transform .1s, background .15s;
+  }
+  .btn:hover { border-color: var(--sky); }
+  .btn:active { transform: scale(.96); }
+  .btn.fav-on { background: #ffe3e3; border-color: #ff8787; color: #c92a2a; }
+
+  .draw-btn {
+    font: inherit; font-size: 1.35rem; font-weight: 900;
+    width: 100%; margin-top: 18px;
+    padding: 16px;
+    border: none; border-radius: 16px;
+    color: #fff;
+    background: linear-gradient(135deg, var(--sun), var(--sun-dark));
+    box-shadow: 0 8px 20px rgba(242,107,29,.35);
+    cursor: pointer;
+    transition: transform .12s, filter .15s;
+  }
+  .draw-btn:hover:not(:disabled) { transform: translateY(-2px); filter: brightness(1.05); }
+  .draw-btn:active:not(:disabled) { transform: translateY(1px); }
+  .draw-btn:disabled { filter: grayscale(.8); opacity: .6; cursor: not-allowed; box-shadow: none; }
+  .key-hint { color: var(--muted); font-size: .85rem; margin-top: 8px; }
+
+  .lists { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 24px; }
+  @media (max-width: 560px) { .lists { grid-template-columns: 1fr; } }
+  .lists ul { list-style: none; margin: 0; padding: 0; }
+  .lists li {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding: 8px 0; border-bottom: 1px solid var(--border);
+  }
+  .lists li:last-child { border-bottom: none; }
+  .lists li a { color: var(--text); text-decoration: none; }
+  .lists li a:hover { color: var(--sky); text-decoration: underline; }
+  .lists li small { color: var(--muted); white-space: nowrap; }
+  .x { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 1rem; padding: 2px 6px; }
+  .x:hover { color: #e03131; }
+  .empty { color: var(--muted); font-size: .9rem; }
+
+  .toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: var(--text); color: var(--bg);
+    padding: 10px 18px; border-radius: 999px;
+    opacity: 0; transition: opacity .25s; pointer-events: none; z-index: 30;
+    max-width: calc(100% - 32px); text-align: center;
+  }
+  .toast.show { opacity: 1; }
+  footer { text-align: center; color: var(--muted); font-size: .85rem; padding: 16px 16px 32px; line-height: 1.7; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🗺️ 週末<span class="hl">去哪</span>？</h1>
+  <p>設定條件、按下抽籤，讓命運決定這週末的台灣小旅行！</p>
+</header>
+
+<main>
+  <!-- 左：篩選 -->
+  <aside class="card">
+    <h3>📍 地區</h3>
+    <div class="chips" id="regionChips"></div>
+
+    <h3>🎯 想玩什麼</h3>
+    <div class="chips" id="typeChips"></div>
+
+    <h3>💰 預算（每人門票／活動）</h3>
+    <select id="budget">
+      <option value="9">不限</option>
+      <option value="0">只要免費的</option>
+      <option value="1">500 元以內</option>
+    </select>
+
+    <label class="switch"><input type="checkbox" id="rain"> ☔ 下雨也能去（室內）</label>
+    <label class="switch"><input type="checkbox" id="transit"> 🚇 只看大眾運輸可到</label>
+
+    <div class="match" id="match"></div>
+    <button class="link-btn" id="resetBtn">重設所有條件</button>
+  </aside>
+
+  <!-- 右：抽籤 -->
+  <section class="card stage">
+    <div class="slot" id="slot">
+      <div class="slot-emoji" id="slotEmoji">🧳</div>
+      <div class="slot-name" id="slotName">準備出發！</div>
+      <div class="slot-city" id="slotCity">按下面的按鈕抽一個景點</div>
+    </div>
+
+    <div class="detail" id="detail">
+      <p class="desc" id="desc"></p>
+      <div class="tags" id="tags"></div>
+      <div class="actions">
+        <a class="btn" id="mapBtn" target="_blank" rel="noopener">🗺️ Google 地圖</a>
+        <button class="btn" id="favBtn">🤍 加入口袋名單</button>
+      </div>
+    </div>
+
+    <button class="draw-btn" id="drawBtn">🎲 抽一個！</button>
+    <label class="switch" style="justify-content:center"><input type="checkbox" id="noRepeat" checked> 不要抽到重複的</label>
+    <div class="key-hint">小技巧：按空白鍵也能抽</div>
+
+    <div class="lists" style="text-align:left">
+      <div>
+        <h3>❤️ 口袋名單</h3>
+        <ul id="favList"></ul>
+      </div>
+      <div>
+        <h3>🕘 抽籤紀錄</h3>
+        <ul id="histList"></ul>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  共收錄 <span id="total"></span> 個台灣景點 · 用 Vibe Coding 製作 · 單一 HTML 檔<br>
+  景點資訊僅供參考，出發前請再確認開放時間、票價與交通狀況。
+</footer>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ---------- 景點資料 ----------
+   [名稱, 縣市, 地區, 類型, 室內外(in/out/both), 預算(0免費/1 500內/2 500以上), 大眾運輸可到, emoji, 簡介] */
+const RAW = [
+  // 北部
+  ['象山步道', '台北市', '北部', ['自然'], 'out', 0, true, '🌃', '約 20 分鐘就能爬到觀景平台，近距離俯瞰台北 101 與信義區夜景。'],
+  ['台北 101 觀景台', '台北市', '北部', ['文化'], 'in', 2, true, '🏙️', '搭超高速電梯直上 89 樓，360 度俯瞰整個台北盆地。'],
+  ['九份老街', '新北市', '北部', ['文化', '美食'], 'out', 1, true, '🏮', '依山而建的山城老街，紅燈籠、芋圓和茶樓是經典畫面。'],
+  ['淡水老街＋漁人碼頭', '新北市', '北部', ['美食', '文化'], 'out', 1, true, '🌅', '搭捷運就到，吃阿給、鐵蛋，傍晚到情人橋看夕陽。'],
+  ['陽明山國家公園', '台北市', '北部', ['自然'], 'out', 0, true, '⛰️', '擎天崗大草原、小油坑噴氣孔，春天還有花季。'],
+  ['國立故宮博物院', '台北市', '北部', ['文化'], 'in', 1, true, '🏛️', '收藏大量珍貴文物，翠玉白菜、肉形石都在這裡，雨天首選。'],
+  ['士林夜市', '台北市', '北部', ['美食'], 'out', 1, true, '🍢', '台北規模最大的夜市之一，炸雞排、蚵仔煎、地下美食街一次吃夠。'],
+  ['北投溫泉', '台北市', '北部', ['溫泉', '自然'], 'both', 1, true, '♨️', '地熱谷、溫泉博物館散步，再找間湯屋泡個溫泉。'],
+  ['十分老街', '新北市', '北部', ['文化'], 'out', 1, true, '🏮', '火車從老街中間穿過，寫下願望放天燈，附近還有十分瀑布。'],
+  ['野柳地質公園', '新北市', '北部', ['自然'], 'out', 1, true, '🪨', '海風侵蝕出的奇岩怪石，招牌是「女王頭」。'],
+  ['猴硐貓村', '新北市', '北部', ['文化', '親子'], 'out', 0, true, '🐈', '曾經的礦業小鎮，現在到處都是慵懶的貓咪。'],
+  ['華山1914文創園區', '台北市', '北部', ['文化'], 'both', 0, true, '🎨', '舊酒廠改建的文創基地，常有展覽、市集與文創小店。'],
+  ['臺北市立動物園', '台北市', '北部', ['親子'], 'out', 1, true, '🐼', '捷運動物園站直達，可以看大貓熊、企鵝和無尾熊。'],
+  ['國立臺灣科學教育館', '台北市', '北部', ['親子'], 'in', 1, true, '🔬', '可以動手玩的科學展示館，旁邊就是兒童新樂園。'],
+  ['貓空纜車', '台北市', '北部', ['自然', '美食'], 'out', 1, true, '🚡', '搭纜車俯瞰山景，到貓空喝茶、吃茶餐。'],
+  ['烏來', '新北市', '北部', ['溫泉', '自然'], 'both', 1, true, '🏞️', '泰雅族文化老街、烏來瀑布、溪邊溫泉一次滿足。'],
+  ['大溪老街', '桃園市', '北部', ['文化', '美食'], 'out', 1, true, '🏘️', '保存完整的巴洛克式牌樓街屋，必吃大溪豆干。'],
+  ['Xpark 水族館', '桃園市', '北部', ['親子'], 'in', 2, true, '🐧', '高鐵桃園站旁的都會型水族館，企鵝和水母區超療癒。'],
+  ['拉拉山', '桃園市', '北部', ['自然'], 'out', 1, false, '🌳', '巨木群步道裡有千年神木，夏天還能吃到水蜜桃。'],
+  ['內灣老街', '新竹縣', '北部', ['文化', '美食'], 'out', 1, true, '🚂', '搭內灣支線小火車抵達，吃野薑花粽和客家美食。'],
+  ['六福村主題遊樂園', '新竹縣', '北部', ['親子'], 'out', 2, false, '🎢', '雲霄飛車、大怒神等刺激設施，還有野生動物園區。'],
+  ['礁溪溫泉', '宜蘭縣', '北部', ['溫泉'], 'both', 1, true, '♨️', '市區就有免費泡腳池，湯圍溝公園泡腳超方便。'],
+  ['國立傳統藝術中心', '宜蘭縣', '北部', ['文化', '親子'], 'both', 1, true, '🎭', '仿古街道裡有傳統工藝、戲曲表演與手作體驗。'],
+  ['太平山國家森林遊樂區', '宜蘭縣', '北部', ['自然'], 'out', 2, false, '🌲', '見晴懷古步道被譽為最美森林步道，秋天還有紅葉。'],
+  ['龜山島賞鯨', '宜蘭縣', '北部', ['自然'], 'out', 2, true, '🐬', '從烏石港搭船出海，有機會看到海豚，還能繞龜山島一圈。'],
+  ['羅東夜市', '宜蘭縣', '北部', ['美食'], 'out', 1, true, '🍡', '宜蘭最熱鬧的夜市，羊肉湯、包心粉圓吃起來。'],
+  // 中部
+  ['高美濕地', '台中市', '中部', ['自然'], 'out', 0, true, '🌇', '走在木棧道上看夕陽倒影與風車，是超熱門的夕陽景點。'],
+  ['宮原眼科', '台中市', '中部', ['美食', '文化'], 'in', 1, true, '🍦', '日治時期眼科診所改建的甜點店，冰淇淋配料多到選不完。'],
+  ['逢甲夜市', '台中市', '中部', ['美食'], 'out', 1, true, '🧋', '許多創意小吃的發源地，一路吃到底保證撐。'],
+  ['審計新村', '台中市', '中部', ['文化', '美食'], 'out', 0, true, '🛍️', '老宿舍改造的文青聚落，假日有手作市集。'],
+  ['臺中國家歌劇院', '台中市', '中部', ['文化'], 'in', 0, true, '🎼', '曲牆建築本身就是藝術品，空中花園可免費參觀。'],
+  ['麗寶樂園', '台中市', '中部', ['親子'], 'out', 2, false, '🎡', '有天空之夢摩天輪、馬拉灣水樂園等設施。'],
+  ['舊山線（勝興車站）', '苗栗縣', '中部', ['文化'], 'out', 0, false, '🛤️', '曾是西部縱貫鐵路的最高點，還能體驗鐵道自行車。'],
+  ['鹿港老街', '彰化縣', '中部', ['文化', '美食'], 'out', 0, true, '🏯', '天后宮、九曲巷、摸乳巷，順便吃蚵仔煎和牛舌餅。'],
+  ['日月潭', '南投縣', '中部', ['自然'], 'out', 1, true, '🚴', '環湖自行車道、遊湖船、纜車，台灣最具代表性的湖泊。'],
+  ['清境農場', '南投縣', '中部', ['自然', '親子'], 'out', 1, false, '🐑', '青青草原上看綿羊秀，高山上的歐風景緻。'],
+  ['合歡山', '南投縣', '中部', ['自然'], 'out', 0, false, '🌌', '開車就能抵達 3000 公尺高山，看雲海、星空，冬天可能下雪。'],
+  ['溪頭自然教育園區', '南投縣', '中部', ['自然', '親子'], 'out', 1, true, '🎋', '大學池竹橋、空中走廊，在森林裡吸飽芬多精。'],
+  // 南部
+  ['阿里山國家森林遊樂區', '嘉義縣', '南部', ['自然'], 'out', 2, true, '🌄', '搭森林小火車，看日出、雲海、神木與櫻花。'],
+  ['文化路夜市', '嘉義市', '南部', ['美食'], 'out', 1, true, '🍗', '嘉義人的廚房，火雞肉飯、豆花、砂鍋魚頭一次吃。'],
+  ['安平古堡＋安平老街', '台南市', '南部', ['文化', '美食'], 'out', 1, true, '🏰', '荷蘭時期古蹟，逛完老街吃蝦捲、豆花、蜜餞。'],
+  ['神農街', '台南市', '南部', ['文化', '美食'], 'out', 0, true, '🏮', '保留老屋風貌的街道，晚上點燈後特別有味道。'],
+  ['奇美博物館', '台南市', '南部', ['文化', '親子'], 'in', 1, true, '🏛️', '歐風建築超好拍，收藏西洋藝術、樂器與兵器。'],
+  ['七股鹽山', '台南市', '南部', ['親子', '自然'], 'out', 1, false, '🧂', '白色鹽山可以爬上去，還能吃鹹冰棒。'],
+  ['駁二藝術特區', '高雄市', '南部', ['文化'], 'both', 0, true, '🎨', '港邊倉庫群變身藝術特區，大型裝置藝術和文創小店。'],
+  ['旗津', '高雄市', '南部', ['美食', '自然'], 'out', 1, true, '⛴️', '搭渡輪過海，吃海產、騎腳踏車、看彩虹教堂。'],
+  ['蓮池潭', '高雄市', '南部', ['文化'], 'out', 0, true, '🐉', '龍虎塔從龍口進、虎口出，象徵去災納福。'],
+  ['衛武營國家藝術文化中心', '高雄市', '南部', ['文化'], 'in', 0, true, '🎻', '榕樹廣場造型的超大建築，可免費入內參觀。'],
+  ['佛陀紀念館', '高雄市', '南部', ['文化'], 'both', 0, true, '🙏', '巨大的佛陀坐像與壯觀建築群，莊嚴又寧靜。'],
+  ['瑞豐夜市', '高雄市', '南部', ['美食'], 'out', 1, true, '🍤', '高雄在地人最愛的夜市之一，攤位密集好逛。'],
+  ['墾丁國家公園', '屏東縣', '南部', ['自然'], 'out', 1, true, '🏖️', '陽光沙灘、鵝鑾鼻燈塔、墾丁大街，台灣最南端的度假勝地。'],
+  ['國立海洋生物博物館', '屏東縣', '南部', ['親子'], 'in', 2, false, '🐠', '海底隧道和珊瑚王國館，還能預約夜宿水族館。'],
+  ['小琉球', '屏東縣', '南部', ['自然'], 'out', 2, true, '🐢', '從東港搭船約半小時，浮潛就有機會和海龜一起游泳。'],
+  // 東部
+  ['七星潭', '花蓮縣', '東部', ['自然'], 'out', 0, true, '🌊', '彎月形的礫石海灘，海水湛藍，最適合放空。'],
+  ['東大門夜市', '花蓮縣', '東部', ['美食'], 'out', 1, true, '🍢', '花蓮最大的夜市，原住民烤肉、炸蛋蔥油餅必吃。'],
+  ['鯉魚潭', '花蓮縣', '東部', ['自然'], 'out', 0, false, '🛶', '群山環繞的湖泊，可以划船、騎腳踏車環湖。'],
+  ['花蓮遠雄海洋公園', '花蓮縣', '東部', ['親子'], 'out', 2, false, '🐬', '有海洋動物表演和遊樂設施，依山面海景色很棒。'],
+  ['伯朗大道', '台東縣', '東部', ['自然'], 'out', 0, true, '🌾', '池上一望無際的稻田，從池上車站租腳踏車就能騎過去。'],
+  ['三仙台', '台東縣', '東部', ['自然'], 'out', 0, false, '🌉', '八拱跨海步橋連接離岸小島，是看日出的熱門地點。'],
+  ['鹿野高台', '台東縣', '東部', ['自然'], 'out', 0, false, '🎈', '夏天熱氣球嘉年華最熱鬧，平時也能眺望縱谷景色。'],
+  ['台東森林公園', '台東縣', '東部', ['自然'], 'out', 0, true, '🚲', '市區旁的大片森林，騎腳踏車繞琵琶湖、活水湖。'],
+  ['知本溫泉', '台東縣', '東部', ['溫泉'], 'both', 1, true, '♨️', '台東著名溫泉區，附近還有知本國家森林遊樂區。'],
+  // 離島
+  ['澎湖', '澎湖縣', '離島', ['自然'], 'out', 2, false, '🏝️', '雙心石滬、跨海大橋，夏天還有花火節。'],
+  ['綠島', '台東縣', '離島', ['自然', '溫泉'], 'out', 2, false, '🤿', '浮潛看珊瑚、騎機車環島，晚上泡朝日溫泉。'],
+  ['蘭嶼', '台東縣', '離島', ['自然', '文化'], 'out', 2, false, '🛶', '達悟族拼板舟與地下屋，原始又純淨的海島。'],
+  ['金門', '金門縣', '離島', ['文化'], 'both', 2, false, '🏯', '戰地坑道、閩南古厝和風獅爺，必買貢糖。'],
+  ['馬祖', '連江縣', '離島', ['自然', '文化'], 'out', 2, false, '💙', '春夏夜晚有機會看到藍眼淚，還有閩東石頭屋聚落。']
+];
+const SPOTS = RAW.map(([name, city, region, types, io, cost, transit, emoji, desc]) =>
+  ({ name, city, region, types, io, cost, transit, emoji, desc }));
+
+const REGIONS = { '北部': '--north', '中部': '--central', '南部': '--south', '東部': '--east', '離島': '--island' };
+const TYPES = { '自然': '🌿', '文化': '🏛️', '美食': '🍜', '親子': '🧸', '溫泉': '♨️' };
+const IO_LABEL = { in: '🏠 室內', out: '☀️ 戶外', both: '🌦️ 室內外皆有' };
+const COST_LABEL = ['🆓 免費', '💵 500 元內', '💰 500 元以上'];
+
+const $ = id => document.getElementById(id);
+const state = { regions: new Set(), types: new Set() };
+let drawing = false;
+let current = null;
+const drawn = new Set();
+
+/* ---------- 儲存 ---------- */
+const store = {
+  get(k, f) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : f; } catch { return f; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+};
+let favs = store.get('trip-favs', []);
+let hist = store.get('trip-hist', []);
+
+/* ---------- 篩選 ---------- */
+function filtered() {
+  const budget = +$('budget').value;
+  return SPOTS.filter(s =>
+    (!state.regions.size || state.regions.has(s.region)) &&
+    (!state.types.size || s.types.some(t => state.types.has(t))) &&
+    s.cost <= budget &&
+    (!$('rain').checked || s.io !== 'out') &&
+    (!$('transit').checked || s.transit)
+  );
+}
+function updateMatch() {
+  const n = filtered().length;
+  const m = $('match');
+  if (n) {
+    m.className = 'match';
+    m.innerHTML = `符合條件：<b>${n}</b> 個景點`;
+  } else {
+    m.className = 'match zero';
+    m.textContent = '沒有符合的景點 😢 試著放寬條件吧';
+  }
+  $('drawBtn').disabled = !n || drawing;
+}
+
+function makeChip(label, onToggle, region) {
+  const b = document.createElement('button');
+  b.className = 'chip';
+  b.textContent = label;
+  b.setAttribute('aria-pressed', 'false');
+  if (region) { b.dataset.region = region; b.style.setProperty('--c', `var(${REGIONS[region]})`); }
+  b.onclick = () => {
+    const on = b.getAttribute('aria-pressed') !== 'true';
+    b.setAttribute('aria-pressed', on);
+    onToggle(on);
+    updateMatch();
+  };
+  return b;
+}
+Object.keys(REGIONS).forEach(r =>
+  $('regionChips').appendChild(makeChip(r, on => on ? state.regions.add(r) : state.regions.delete(r), r)));
+Object.entries(TYPES).forEach(([t, e]) =>
+  $('typeChips').appendChild(makeChip(`${e} ${t}`, on => on ? state.types.add(t) : state.types.delete(t))));
+
+/* ---------- 抽籤 ---------- */
+function show(s) {
+  $('slotEmoji').textContent = s.emoji;
+  $('slotName').textContent = s.name;
+  $('slotCity').textContent = s.city;
+}
+
+function draw() {
+  if (drawing) return;
+  const pool = filtered();
+  if (!pool.length) return;
+
+  let candidates = $('noRepeat').checked ? pool.filter(s => !drawn.has(s.name)) : pool;
+  if (!candidates.length) {
+    pool.forEach(s => drawn.delete(s.name));
+    candidates = pool;
+    toast('符合條件的景點都抽過一輪了，重新開始！');
+  }
+  // 先決定結果，再播動畫
+  const pick = candidates[Math.floor(Math.random() * candidates.length)];
+
+  drawing = true;
+  $('drawBtn').disabled = true;
+  $('detail').classList.remove('show');
+  const slot = $('slot');
+  slot.className = 'slot rolling';
+
+  const steps = 24;
+  let i = 0;
+  (function roll() {
+    if (i < steps - 1) {
+      const s = pool.length > 1
+        ? pool.filter(p => p !== pick)[Math.floor(Math.random() * (pool.length - 1))]
+        : pick;
+      show(s);
+      i++;
+      setTimeout(roll, 45 + i * i * 0.55);   // 越來越慢，像拉霸停下
+    } else {
+      show(pick);
+      finish(pick);
+    }
+  })();
+}
+
+function finish(s) {
+  drawing = false;
+  current = s;
+  drawn.add(s.name);
+  $('slot').className = 'slot done';
+
+  $('desc').textContent = s.desc;
+  const tags = $('tags');
+  tags.innerHTML = '';
+  const addTag = (text, cls, color) => {
+    const t = document.createElement('span');
+    t.className = 'tag' + (cls ? ' ' + cls : '');
+    t.textContent = text;
+    if (color) t.style.setProperty('--c', `var(${color})`);
+    tags.appendChild(t);
+  };
+  addTag(s.region, 'region', REGIONS[s.region]);
+  s.types.forEach(t => addTag(`${TYPES[t]} ${t}`));
+  addTag(IO_LABEL[s.io]);
+  addTag(COST_LABEL[s.cost]);
+  addTag(s.transit ? '🚇 大眾運輸可到' : '🚗 建議開車／騎車');
+  $('mapBtn').href = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(s.name.split('＋')[0] + ' ' + s.city);
+  updateFavBtn();
+  $('detail').classList.add('show');
+
+  const time = new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' });
+  hist.unshift({ name: s.name, time });
+  hist = hist.slice(0, 8);
+  store.set('trip-hist', hist);
+  renderLists();
+  updateMatch();
+}
+
+/* ---------- 口袋名單 & 紀錄 ---------- */
+function updateFavBtn() {
+  const on = current && favs.includes(current.name);
+  $('favBtn').textContent = on ? '❤️ 已在口袋名單' : '🤍 加入口袋名單';
+  $('favBtn').classList.toggle('fav-on', !!on);
+}
+function toggleFav(name) {
+  favs = favs.includes(name) ? favs.filter(f => f !== name) : [name, ...favs];
+  store.set('trip-favs', favs);
+  updateFavBtn();
+  renderLists();
+}
+function spotLink(name) {
+  const s = SPOTS.find(x => x.name === name);
+  const a = document.createElement('a');
+  a.textContent = s ? `${s.emoji} ${name}` : name;
+  a.href = '#';
+  a.onclick = e => { e.preventDefault(); if (s && !drawing) { show(s); finish(s); } };
+  return a;
+}
+function renderLists() {
+  const fl = $('favList');
+  fl.innerHTML = '';
+  if (!favs.length) fl.innerHTML = '<li class="empty">按 🤍 收藏想去的景點</li>';
+  favs.forEach(name => {
+    const li = document.createElement('li');
+    li.appendChild(spotLink(name));
+    const x = document.createElement('button');
+    x.className = 'x'; x.textContent = '✕'; x.title = '移除';
+    x.onclick = () => toggleFav(name);
+    li.appendChild(x);
+    fl.appendChild(li);
+  });
+
+  const hl = $('histList');
+  hl.innerHTML = '';
+  if (!hist.length) hl.innerHTML = '<li class="empty">還沒抽過，快試試看！</li>';
+  hist.forEach(h => {
+    const li = document.createElement('li');
+    li.appendChild(spotLink(h.name));
+    const t = document.createElement('small');
+    t.textContent = h.time;
+    li.appendChild(t);
+    hl.appendChild(li);
+  });
+}
+
+function toast(msg) {
+  const el = $('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toast.t);
+  toast.t = setTimeout(() => el.classList.remove('show'), 2200);
+}
+
+/* ---------- 事件 ---------- */
+['budget', 'rain', 'transit'].forEach(id => $(id).addEventListener('change', updateMatch));
+$('drawBtn').onclick = draw;
+$('favBtn').onclick = () => current && toggleFav(current.name);
+$('resetBtn').onclick = () => {
+  state.regions.clear(); state.types.clear();
+  document.querySelectorAll('.chip').forEach(c => c.setAttribute('aria-pressed', 'false'));
+  $('budget').value = '9'; $('rain').checked = false; $('transit').checked = false;
+  updateMatch();
+};
+document.addEventListener('keydown', e => {
+  const tag = document.activeElement.tagName;
+  if (e.code === 'Space' && !['SELECT', 'INPUT', 'BUTTON', 'A'].includes(tag)) { e.preventDefault(); draw(); }
+});
+
+$('total').textContent = SPOTS.length;
+updateMatch();
+renderLists();
+</script>
+</body>
+</html>
